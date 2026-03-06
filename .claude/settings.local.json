@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --no-import-alias --use-npm)",
+      "Bash(npm install)",
+      "Bash(npm run build)",
+      "Bash(npm install --save-dev @neondatabase/serverless)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_qb8RTIu9VsjG@ep-damp-heart-a1w3gyto.ap-southeast-1.aws.neon.tech/neondb?sslmode=require\" node scripts/export-from-neon.js)",
+      "Bash(node scripts/import-to-d1.js)",
+      "Bash(npx wrangler d1 execute loto6-check-db --file=scripts/import-winning-numbers.sql --local)",
+      "Bash(npm uninstall @neondatabase/serverless)",
+      "Bash(npx wrangler deploy)"
+    ]
+  }
+}
