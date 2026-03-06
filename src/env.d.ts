@@ -2,4 +2,5 @@
 
 interface CloudflareEnv {
   DB: D1Database;
+  AUTO_UPDATE_API_KEY: string;
 }

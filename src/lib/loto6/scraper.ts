@@ -1,5 +1,3 @@
-import * as cheerio from 'cheerio'
-
 export interface ScrapedWinningNumbers {
     drawDate: string // YYYY-MM-DD
     mainNumbers: number[]
@@ -7,101 +5,113 @@ export interface ScrapedWinningNumbers {
     drawNumber?: number
 }
 
-/**
- * fetch + cheerio でロト6の公式サイトから当選番号をスクレイピング
- * Cloudflare Workers対応（Puppeteer不要）
- */
-export async function scrapeWinningNumbers(url: string): Promise<ScrapedWinningNumbers[]> {
-    console.log(`[Scraper] Fetching URL: ${url}`)
+const NAME_TXT_URL = 'https://www.mizuhobank.co.jp/takarakuji/apl/txt/loto6/name.txt'
+const CSV_BASE_URL = 'https://www.mizuhobank.co.jp/retail/takarakuji/loto/loto6/csv/'
 
-    const response = await fetch(url, {
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        },
-    })
+// 令和を西暦に変換
+function convertWareki(text: string): string | null {
+    const match = text.match(/令和(\d+)年(\d{1,2})月(\d{1,2})日/)
+    if (!match) return null
+    const year = 2018 + parseInt(match[1], 10)
+    const month = match[2].padStart(2, '0')
+    const day = match[3].padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
 
+// Shift-JISのレスポンスをテキストに変換
+async function fetchShiftJIS(url: string): Promise<string> {
+    const response = await fetch(url)
     if (!response.ok) {
-        throw new Error(`[Scraper] HTTP error: ${response.status}`)
+        throw new Error(`HTTP error: ${response.status}`)
+    }
+    const buffer = await response.arrayBuffer()
+    const decoder = new TextDecoder('shift_jis')
+    return decoder.decode(buffer)
+}
+
+/**
+ * みずほ銀行のCSVデータから最新の当選番号を取得
+ * Cloudflare Workers対応
+ */
+export async function scrapeWinningNumbers(): Promise<ScrapedWinningNumbers[]> {
+    console.log('[Scraper] Fetching name.txt to find latest CSV...')
+
+    const nameText = await fetchShiftJIS(NAME_TXT_URL)
+    const lines = nameText.split(/\r?\n/)
+
+    // 最新のCSVファイル名を取得
+    const nameLine = lines.find(line => line.startsWith('NAME'))
+    if (!nameLine) {
+        console.error('[Scraper] No CSV filename found in name.txt')
+        return []
     }
 
-    const html = await response.text()
-    console.log(`[Scraper] HTML length: ${html.length} characters`)
-
-    const $ = cheerio.load(html)
-    const results: ScrapedWinningNumbers[] = []
-
-    // 回号を含むテーブルを取得
-    const issueElement = $('.js-lottery-issue-pc').first()
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let $table: cheerio.Cheerio<any>
-    if (issueElement.length > 0) {
-        $table = issueElement.closest('table')
-        if ($table.length === 0) {
-            console.warn('[Scraper] Table not found via .closest(), trying fallback')
-            $table = $('table').first()
-        }
-    } else {
-        console.warn('[Scraper] .js-lottery-issue-pc not found, trying fallback')
-        $table = $('table').first()
+    const csvFile = nameLine.split('\t')[1]?.trim()
+    if (!csvFile) {
+        console.error('[Scraper] Could not parse CSV filename')
+        return []
     }
 
-    if ($table.length === 0) {
-        console.error('[Scraper] No tables found')
-        return results
+    console.log(`[Scraper] Fetching CSV: ${csvFile}`)
+    const csvText = await fetchShiftJIS(CSV_BASE_URL + csvFile)
+    const csvLines = csvText.split(/\r?\n/).filter(line => line.trim())
+
+    // CSVフォーマット:
+    // Line 0: A52
+    // Line 1: 第2082回ロト６,数字選択式全国自治宝くじ,令和8年3月5日,...
+    // Line 2: 支払期間,...
+    // Line 3: 本数字,05,11,14,19,25,40,ボーナス数字,17
+
+    if (csvLines.length < 4) {
+        console.error('[Scraper] CSV data too short')
+        return []
     }
 
-    // 抽選日を取得
-    const dateText = $table.find('.js-lottery-date-pc').first().text().trim()
-    let drawDate = ''
-    if (dateText) {
-        const match = dateText.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/)
-        if (match) {
-            const [, year, month, day] = match
-            drawDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-        }
+    // 回号と日付を取得
+    const infoLine = csvLines[1]
+    const drawMatch = infoLine.match(/第(\d+)回/)
+    const drawNumber = drawMatch ? parseInt(drawMatch[1], 10) : undefined
+
+    const dateMatch = infoLine.match(/令和\d+年\d{1,2}月\d{1,2}日/)
+    const drawDate = dateMatch ? convertWareki(dateMatch[0]) : null
+
+    if (!drawDate) {
+        console.error(`[Scraper] Could not parse date from: ${infoLine}`)
+        return []
     }
 
-    // 回号を取得
-    const issueText = $table.find('.js-lottery-issue-pc').first().text().trim()
-    let drawNumber: number | undefined
-    if (issueText) {
-        const drawMatch = issueText.match(/第(\d+)回/)
-        if (drawMatch) {
-            drawNumber = parseInt(drawMatch[1], 10)
-        }
+    // 本数字とボーナス数字を取得
+    const numbersLine = csvLines[3]
+    const parts = numbersLine.split(',')
+    // "本数字,05,11,14,19,25,40,ボーナス数字,17"
+    const mainNumbers: number[] = []
+    let bonusNumber = NaN
+
+    const bonusIndex = parts.indexOf('ボーナス数字')
+    if (bonusIndex === -1) {
+        console.error(`[Scraper] Could not find bonus number marker in: ${numbersLine}`)
+        return []
     }
 
-    // 本数字を取得
-    const numbers: number[] = []
-    $table.find('.js-lottery-number-pc').each((_, elem) => {
-        const numText = $(elem).text().trim()
-        const num = parseInt(numText, 10)
-        if (!isNaN(num) && num >= 1 && num <= 43) {
-            numbers.push(num)
-        }
-    })
+    // 本数字: index 1 ~ bonusIndex-1
+    for (let i = 1; i < bonusIndex; i++) {
+        mainNumbers.push(parseInt(parts[i], 10))
+    }
+    // ボーナス数字: bonusIndex+1
+    bonusNumber = parseInt(parts[bonusIndex + 1], 10)
 
-    // ボーナス数字を取得
-    const bonusText = $table.find('.js-lottery-bonus-pc').first().text().trim()
-    const bonusMatch = bonusText.match(/\((\d+)\)/)
-    const bonusNumber = bonusMatch
-        ? parseInt(bonusMatch[1], 10)
-        : parseInt(bonusText.replace(/[()]/g, ''), 10)
-
-    // データの検証
-    if (!drawDate || numbers.length !== 6 || isNaN(bonusNumber)) {
-        console.warn(`[Scraper] Invalid data - date: "${dateText}", numbers: ${numbers.length}, bonus: ${bonusNumber}`)
-        return results
+    if (mainNumbers.length !== 6 || isNaN(bonusNumber)) {
+        console.warn(`[Scraper] Invalid data - numbers: ${mainNumbers.length}, bonus: ${bonusNumber}`)
+        return []
     }
 
-    results.push({
+    const result: ScrapedWinningNumbers = {
         drawDate,
-        mainNumbers: numbers.sort((a, b) => a - b),
+        mainNumbers: mainNumbers.sort((a, b) => a - b),
         bonusNumber,
         drawNumber,
-    })
+    }
 
-    console.log(`[Scraper] Found: ${drawDate} (第${drawNumber || 'N/A'}回), 本数字: [${numbers.join(',')}], ボーナス: ${bonusNumber}`)
-    return results
+    console.log(`[Scraper] Found: ${drawDate} (第${drawNumber || 'N/A'}回), 本数字: [${mainNumbers.join(',')}], ボーナス: ${bonusNumber}`)
+    return [result]
 }
