@@ -1,0 +1,16 @@
+name = "loto6-check"
+main = ".open-next/worker.js"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".open-next/assets"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "loto6-check-db"
+database_id = "6b2c4f87-0922-4577-90f7-58a6609bb450"
+
+# Cron Triggers: 火曜・金曜 9:00 UTC (18:00 JST)
+[triggers]
+crons = ["0 9 * * 2,5"]
