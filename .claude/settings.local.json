@@ -15,7 +15,10 @@
       "Bash(curl.exe --ssl-no-revoke -s \"https://www.mizuhobank.co.jp/takarakuji/check/loto/loto6/index.html\")",
       "Bash(curl.exe --ssl-no-revoke -s \"https://www.mizuhobank.co.jp/common2024/js/transfer/lottery.js\")",
       "Bash(curl.exe --ssl-no-revoke -s \"https://www.mizuhobank.co.jp/retail/takarakuji/loto/loto6/csv/loto6.csv\")",
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(mkdir -p public)",
+      "Bash(npm install sharp --save-dev)",
+      "Bash(npm uninstall sharp)"
     ]
   }
 }
