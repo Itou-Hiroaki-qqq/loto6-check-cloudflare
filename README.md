@@ -9,8 +9,8 @@
 - **デプロイ**: OpenNext + Cloudflare Workers
 - **データベース**: Cloudflare D1（SQLite）
 - **認証**: カスタムJWT（PBKDF2 + HMAC-SHA256, Web Crypto API）
-- **スクレイピング**: fetch + cheerio（みずほ銀行公式サイトから当選番号取得）
-- **自動更新**: Cloudflare Cron Triggers（火・金9:00 JST）
+- **当選番号取得**: みずほ銀行公式CSV直接取得（Shift-JIS対応）
+- **自動更新**: 外部Cronサービス（cron-job.org）で月・木22:00 JSTに実行
 
 ## 機能
 
@@ -18,7 +18,7 @@
 - ロト6番号の登録・削除
 - 当選番号との照合（1等〜5等）
 - 期間指定での当選番号チェック
-- 当選番号の自動取得（Cron Trigger）
+- 当選番号の自動取得（外部Cronサービス経由）
 
 ## セットアップ
 

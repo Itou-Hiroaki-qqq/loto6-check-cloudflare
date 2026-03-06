@@ -9,7 +9,13 @@
       "Bash(node scripts/import-to-d1.js)",
       "Bash(npx wrangler d1 execute loto6-check-db --file=scripts/import-winning-numbers.sql --local)",
       "Bash(npm uninstall @neondatabase/serverless)",
-      "Bash(npx wrangler deploy)"
+      "Bash(npx wrangler deploy)",
+      "Bash(npm uninstall cheerio)",
+      "WebFetch(domain:www.mizuhobank.co.jp)",
+      "Bash(curl.exe --ssl-no-revoke -s \"https://www.mizuhobank.co.jp/takarakuji/check/loto/loto6/index.html\")",
+      "Bash(curl.exe --ssl-no-revoke -s \"https://www.mizuhobank.co.jp/common2024/js/transfer/lottery.js\")",
+      "Bash(curl.exe --ssl-no-revoke -s \"https://www.mizuhobank.co.jp/retail/takarakuji/loto/loto6/csv/loto6.csv\")",
+      "Bash(node -e \":*)"
     ]
   }
 }

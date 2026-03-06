@@ -3,14 +3,13 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { scrapeWinningNumbers } from "@/lib/loto6/scraper";
 import { numbersToJson } from "@/lib/db";
 
-const LOTO6_URL =
-  "https://www.mizuhobank.co.jp/takarakuji/check/loto/loto6/index.html";
-
 async function handleAutoUpdate(request: NextRequest) {
   try {
+    const { env } = await getCloudflareContext({ async: true });
+
     // APIキー認証
     const apiKey = request.headers.get("x-api-key");
-    const expectedApiKey = process.env.AUTO_UPDATE_API_KEY;
+    const expectedApiKey = env.AUTO_UPDATE_API_KEY;
 
     if (!expectedApiKey) {
       console.error("[Auto Update] AUTO_UPDATE_API_KEY is not set");
@@ -27,7 +26,7 @@ async function handleAutoUpdate(request: NextRequest) {
 
     console.log("[Auto Update] Starting automatic update...");
 
-    const results = await scrapeWinningNumbers(LOTO6_URL);
+    const results = await scrapeWinningNumbers();
 
     if (results.length === 0) {
       console.warn("[Auto Update] No winning numbers found");
@@ -38,7 +37,6 @@ async function handleAutoUpdate(request: NextRequest) {
       });
     }
 
-    const { env } = await getCloudflareContext({ async: true });
     const db = env.DB;
 
     let savedCount = 0;
