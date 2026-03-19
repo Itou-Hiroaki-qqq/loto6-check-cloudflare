@@ -9,8 +9,8 @@
 - **デプロイ**: OpenNext + Cloudflare Workers
 - **データベース**: Cloudflare D1（SQLite）
 - **認証**: カスタムJWT（PBKDF2 + HMAC-SHA256, Web Crypto API）
-- **当選番号取得**: みずほ銀行公式CSV直接取得（Shift-JIS対応）
-- **自動更新**: 外部Cronサービス（cron-job.org）で月・木22:00 JSTに実行
+- **当選番号取得**: loto6-auto-update（Cloud Run + Puppeteer）経由で取得
+- **自動更新**: cron-job.org → loto6-auto-update → `/api/loto6/import` でD1に同期（月・木22:00 JST）
 
 ## 機能
 
@@ -18,7 +18,25 @@
 - ロト6番号の登録・削除
 - 当選番号との照合（1等〜5等）
 - 期間指定での当選番号チェック
-- 当選番号の自動取得（外部Cronサービス経由）
+- 当選番号の自動取得（loto6-auto-updateからのデータ同期）
+
+## 自動更新の仕組み
+
+Cloudflare WorkersからはAkamai WAFにより、みずほ銀行への直接アクセスがブロックされるため、別サービス経由でデータを取得しています。
+
+```
+cron-job.org（月・木 22:00 JST）
+  → loto6-auto-update（Cloud Run + Puppeteer）
+    → みずほ銀行をスクレイピング → Neon保存
+    → POST /api/loto6/import → Cloudflare D1保存
+```
+
+### 必要な環境変数（loto6-auto-update側）
+
+| 変数名 | 説明 |
+|--------|------|
+| `CLOUDFLARE_APP_URL` | このアプリのURL（例: `https://loto6-check.xxx.workers.dev`） |
+| `CLOUDFLARE_API_KEY` | このアプリの `AUTO_UPDATE_API_KEY` と同じ値 |
 
 ## セットアップ
 
@@ -57,7 +75,7 @@ src/
   app/
     api/
       auth/       - 認証API (login, register, me, logout)
-      loto6/      - ロト6API (register, list, delete, from-db, auto-update)
+      loto6/      - ロト6API (register, list, delete, from-db, auto-update, import)
     login/        - ログインページ
     signup/       - 新規登録ページ
   components/     - UIコンポーネント
