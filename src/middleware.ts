@@ -14,8 +14,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // auto-update APIはAPIキー認証なのでスキップ
-  if (pathname.startsWith("/api/loto6/auto-update")) {
+  // auto-update / import APIはAPIキー認証なのでスキップ
+  if (pathname.startsWith("/api/loto6/auto-update") || pathname.startsWith("/api/loto6/import")) {
     return NextResponse.next();
   }
 
